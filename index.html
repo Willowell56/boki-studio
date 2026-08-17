@@ -24642,8 +24642,15 @@ function startDrillSession(ids, opts) {
     lastCoins = rec.coins; coinTotal += rec.coins;
     lastResult = { ok: ok, type: result, userEntries: userEntries };
 
-    // 3連続正解での論点クリアは「全部自力(level 2)」で解いたときだけ数える
-    if (level === 2) {
+    // 3連続正解での論点クリアは「全部自力(level 2)」で解いたときだけ数える。
+    // さらに、とっくん(章別特訓/ランダム/ミニテスト)は全論点を横断して出題するため、
+    // レッスンを一度も開いていない(未着手)論点まで誤ってクリア扱いにしないよう、
+    // 「論点セッション(opts.topicId)」または「その論点が着手済み
+    // (scaffold設定済み or 既にcleared済み)」のときだけ進行させる
+    if (level === 2 && (opts.topicId || (function () {
+      var tId0 = drillTopicId(drill.id);
+      return tId0 && (S.scaffold[tId0] !== undefined || S.cleared[tId0]);
+    })())) {
       var tId = drillTopicId(drill.id);
       if (tId) {
         if (ok) {
@@ -25597,13 +25604,14 @@ function reflexAcctSide(acctName, dir) {
   return home === "debit" ? "credit" : "debit";
 }
 
-// 勘定科目編の出題プール: 着手済み論点(S.scaffold/S.clearedがある論点)のドリルの正解仕訳に
-// 登場する勘定科目から、contra(定位置反転)・temp(仮勘定・定位置不定)・
-// consol(連結修正/表示専用で個別の帳簿に定位置を持たない)を除いたもの。
-// 該当が1件も無い場合(データ不整合等への保険)は現在の級の科目一覧にフォールバックする
+// 勘定科目編の出題プール: 現在の級の全ドリル(着手済み論点に絞らない・特訓経由の
+// 未習出題と同じ方針)の正解仕訳に登場する勘定科目から、contra(定位置反転)・
+// temp(仮勘定・定位置不定)・consol(連結修正/表示専用で個別の帳簿に定位置を持たない)
+// を除いたもの。該当が1件も無い場合(データ不整合等への保険)は現在の級の科目一覧に
+// フォールバックする
 function reflexAcctPool() {
   var accounts = (window.Boki && window.Boki.ACCOUNTS) || (typeof ACCOUNTS !== "undefined" ? ACCOUNTS : {});
-  var drillIds = startedIds(S.level, "drill");
+  var drillIds = levelDrillQuizIds(S.level).drillIds;
   var seen = {}, names = [];
   drillIds.forEach(function (id) {
     var d = findDrill(id);
@@ -25826,22 +25834,23 @@ var ERR_TYPES = [
   { key: "amount", label: "金額", advice: "金額のまちがいが多いです。仕訳のあと、金額をもう一度たしかめる習慣をつけましょう。" }
 ];
 
-// 着手済み論点(S.scaffold[topicId]!==undefined || S.cleared[topicId])のdrill idだけを返す
+// 現在の級のdrill/quiz id一覧(levelDrillQuizIdsの薄いラッパー)。とっくんメニューの
+// 各機能(ランダム仕訳10問・章をえらんで特訓・ミニテスト)はすべてinfo.drillIds
+// (着手済み論点に絞らない全ドリル)からの出題に統一している(クリア縛り撤廃)
 function drillEligibleInfo() {
   var info = levelDrillQuizIds(S.level);
-  var started = startedIds(S.level, "drill");
-  return { info: info, startedDrillIds: started };
+  return { info: info };
 }
 
-// 「章をえらんで特訓」向け: 1件以上の着手済み論点を持つ章のみ、その論点一覧つきで返す
+// 「章をえらんで特訓」向け: 現在の級の全章を、その章の全論点一覧つきで返す
+// (クリア/着手縛りは撤廃。準備中の級=topics:[]の章は自然に除外される)
 function drillChapterOptions() {
   var content = (typeof CONTENT !== "undefined") ? CONTENT : (window.Boki && window.Boki.CONTENT);
   var lv = ((content && content.levels) || []).filter(function (l) { return l.id === (S.level || 3); })[0];
   var out = [];
   (lv && lv.chapters || []).forEach(function (ch) {
     var topics = ch.topics || [];
-    var startedTopics = topics.filter(function (tp) { return S.scaffold[tp.id] !== undefined || !!S.cleared[tp.id]; });
-    if (startedTopics.length) out.push({ id: ch.id, title: ch.title, startedTopics: startedTopics });
+    if (topics.length) out.push({ id: ch.id, title: ch.title, topics: topics });
   });
   return out;
 }
@@ -25908,13 +25917,12 @@ function weakDrillCandidates() {
 
 function drillMenuHtml() {
   var d = drillEligibleInfo();
-  var randomDisabled = d.startedDrillIds.length === 0;
+  var randomDisabled = d.info.drillIds.length === 0;
   var minitestNeed = 15;
-  var minitestDisabled = d.startedDrillIds.length < minitestNeed;
+  var minitestDisabled = d.info.drillIds.length < minitestNeed;
   var weak = weakDrillCandidates();
   var weakDisabled = !weak.anyAvailable;
   var chaptersDisabled = drillChapterOptions().length === 0;
-  var reflexAcctDisabled = Object.keys(S.cleared).length === 0;
 
   var html = "";
   html += '<div class="card drill-menu-card"><h3>⚡ 左か右か? 瞬発クイズ</h3>' +
@@ -25922,24 +25930,21 @@ function drillMenuHtml() {
     '<div class="reflex-mode-row">' +
       '<button type="button" class="btn" data-act="reflex-start" data-mode="home">定位置編</button>' +
       '<button type="button" class="btn" data-act="reflex-start" data-mode="group">グループ編</button>' +
-      (reflexAcctDisabled
-        ? '<button type="button" class="btn ghost" disabled>勘定科目編</button>'
-        : '<button type="button" class="btn ghost" data-act="reflex-start" data-mode="acct">勘定科目編</button>') +
+      '<button type="button" class="btn ghost" data-act="reflex-start" data-mode="acct">勘定科目編</button>' +
     '</div>' +
-    (reflexAcctDisabled ? '<p class="drill-menu-hint">論点を1つクリアすると解放</p>' : '') +
     '</div>';
 
   html += '<div class="card drill-menu-card"><h3>ランダム仕訳10問</h3>' +
-    '<p class="drill-menu-desc">着手した論点から章をまたいでシャッフル出題します(交互学習)。</p>' +
+    '<p class="drill-menu-desc">今の級の全ドリルから章をまたいでシャッフル出題します(交互学習・未習論点もふくむ)。</p>' +
     (randomDisabled
-      ? ('<p class="drill-menu-hint">まずは「まなぶ」でレッスンをすすめましょう。</p><button type="button" class="btn" disabled>ランダム仕訳10問</button>')
+      ? ('<p class="drill-menu-hint">このレベルのドリルはまだありません。</p><button type="button" class="btn" disabled>ランダム仕訳10問</button>')
       : ('<button type="button" class="btn" data-act="drill-random">ランダム仕訳10問</button>')) +
     '</div>';
 
   html += '<div class="card drill-menu-card"><h3>章をえらんで特訓</h3>' +
-    '<p class="drill-menu-desc">章を選ぶと、その章で着手した論点の問題を集中的に解けます(最大15問)。</p>' +
+    '<p class="drill-menu-desc">章を選ぶと、その章の全論点の問題を集中的に解けます(最大15問・未習論点もふくむ)。</p>' +
     (chaptersDisabled
-      ? ('<p class="drill-menu-hint">まずは1つ論点をはじめましょう。</p><button type="button" class="btn ghost" disabled>章を選ぶ</button>')
+      ? ('<p class="drill-menu-hint">このレベルの章はまだありません。</p><button type="button" class="btn ghost" disabled>章を選ぶ</button>')
       : ('<button type="button" class="btn ghost" data-act="drill-goto-chapters">章を選ぶ</button>')) +
     '</div>';
 
@@ -25953,7 +25958,7 @@ function drillMenuHtml() {
   html += '<div class="card drill-menu-card"><h3>ミニテスト</h3>' +
     '<p class="drill-menu-desc">仕訳15問・本番第1問形式。タイマーで時間を計ります(45点満点)。</p>' +
     (minitestDisabled
-      ? ('<p class="drill-menu-hint">着手した論点の問題があと' + (minitestNeed - d.startedDrillIds.length) + '問必要です。</p><button type="button" class="btn ghost" disabled>ミニテストをはじめる</button>')
+      ? ('<p class="drill-menu-hint">このレベルの問題があと' + (minitestNeed - d.info.drillIds.length) + '問必要です。</p><button type="button" class="btn ghost" disabled>ミニテストをはじめる</button>')
       : ('<button type="button" class="btn ghost" data-act="drill-minitest">ミニテストをはじめる</button>')) +
     '</div>';
 
@@ -25964,7 +25969,7 @@ function drillChaptersHtml() {
   var chapters = drillChapterOptions();
   var rows = chapters.map(function (ch) {
     var drillCount = 0;
-    ch.startedTopics.forEach(function (tp) { drillCount += (tp.drills || []).length; });
+    ch.topics.forEach(function (tp) { drillCount += (tp.drills || []).length; });
     return '<button type="button" class="topic-row" data-act="drill-chapter" data-chapter="' + esc(ch.id) + '">' +
       '<span class="topic-icon learning">' + drillCount + '問</span>' +
       '<span class="topic-title">' + esc(ch.title) + '</span>' +
@@ -26011,7 +26016,7 @@ function drillClickHandler(e) {
     startReflexQuiz(t.dataset.mode);
   } else if (act === "drill-random") {
     var d = drillEligibleInfo();
-    var ids = shuffleArr(d.startedDrillIds).slice(0, 10);
+    var ids = shuffleArr(d.info.drillIds).slice(0, 10);
     if (!ids.length) { toast("問題がありません"); return; }
     startDrillSession(ids, { level: 2 });
   } else if (act === "drill-goto-chapters") {
@@ -26024,7 +26029,7 @@ function drillClickHandler(e) {
     var ch = drillChapterOptions().filter(function (c) { return c.id === t.dataset.chapter; })[0];
     if (!ch) return;
     var chDrillIds = [];
-    ch.startedTopics.forEach(function (tp) { (tp.drills || []).forEach(function (dr) { chDrillIds.push(dr.id); }); });
+    ch.topics.forEach(function (tp) { (tp.drills || []).forEach(function (dr) { chDrillIds.push(dr.id); }); });
     var chIds = shuffleArr(chDrillIds).slice(0, 15);
     if (!chIds.length) { toast("問題がありません"); return; }
     _drillScreen = "menu";
@@ -26041,7 +26046,7 @@ function drillClickHandler(e) {
     startDrillSession(lowIds, { level: 2 });
   } else if (act === "drill-minitest") {
     var mtInfo = drillEligibleInfo();
-    var mtIds = shuffleArr(mtInfo.startedDrillIds).slice(0, 15);
+    var mtIds = shuffleArr(mtInfo.info.drillIds).slice(0, 15);
     if (mtIds.length < 15) { toast("問題数が足りません"); return; }
     startDrillSession(mtIds, { level: 2, minitest: true });
   }
