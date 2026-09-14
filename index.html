@@ -163,6 +163,13 @@ nav.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2p
   border-radius:14px;padding:18px;margin:14px 0;text-align:center}
 .celebrate .emoji{font-size:40px;line-height:1}
 
+/* ===== 30秒サマリー(自動合成・執筆なし。Task 4・v5) ===== */
+.summary-badge{display:inline-block;background:var(--accent-soft);color:var(--accent);font-size:12.5px;
+  font-weight:700;padding:4px 10px;border-radius:999px;margin:0 0 12px}
+.summary-title{font-size:17px;line-height:1.5;margin:0 0 8px}
+.summary-slogan{background:var(--accent-soft);border-radius:10px;padding:12px;margin:0 0 4px;
+  font-size:14.5px;font-weight:700;line-height:1.7}
+
 /* ===== 足場3段階の可視化(scaffold UX) ===== */
 .stage-line{font-size:12px;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;
   justify-content:center;gap:4px;flex-wrap:wrap}
@@ -255,6 +262,31 @@ nav.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2p
 .topic-main .topic-title{flex:none;display:block}
 .topic-chapter{font-size:10.5px;line-height:1.5;color:var(--muted);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ===== リング構造(コア→合格ライン→全網羅)(Task 1・v5) =====
+   3リング(🎯コア=top/✅合格ライン=high/📚全網羅=標準)の進捗をホームのメーターカードと、
+   まなぶ「合格に効く順」の見出し・薄表示で共通して見せる。現在リングの強調は5分類色
+   (--cls-*)/配点バッジ色(--badge-gold)と混同しないよう既存のアクセント色(--accent)を使う */
+.ring-meter-card{text-align:left}
+.ring-meter-current{font-size:20px;font-weight:800;margin:0 0 10px}
+.ring-meter-list{display:flex;flex-direction:column;gap:8px}
+.ring-meter-item{font-size:11.5px;color:var(--muted)}
+.ring-meter-item.current{color:var(--accent);font-weight:700}
+.ring-meter-row{display:flex;justify-content:space-between;margin-bottom:3px}
+.ring-meter-row .ring-meter-count{font-variant-numeric:tabular-nums}
+.ring-meter-item .bar{height:5px;border-radius:999px;background:var(--line);overflow:hidden}
+.ring-meter-item .bar-fill{height:100%;background:var(--right)}
+.ring-meter-item.current .bar-fill{background:var(--accent)}
+
+.ring-heading{display:flex;justify-content:space-between;align-items:center;
+  font-size:11.5px;font-weight:700;color:var(--muted);margin:12px 0 2px;padding:0 2px}
+.ring-heading:first-child{margin-top:0}
+.ring-heading.current{color:var(--accent)}
+.ring-heading-count{font-weight:400;font-variant-numeric:tabular-nums}
+/* 現在リング外(まなぶの見出し・行の両方)は薄表示。タップ自体は禁止しない */
+.ring-dim{opacity:.55}
+
+.celebrate.ring-celebrate{margin-bottom:12px}
 
 /* ===== おみせ(Task 10) ===== */
 .shop-appearance{text-align:center}
@@ -375,11 +407,18 @@ nav.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2p
   text-align:left;background:none;border:none;border-radius:8px;padding:9px 8px;font-family:inherit;
   font-size:13.5px;color:var(--ink);cursor:pointer}
 .mokushi-round-row:active{background:var(--accent-soft)}
+.mokushi-round-row.recommended{background:var(--accent-soft)}
 .mokushi-round-title{flex:none;font-weight:700}
 .mokushi-round-meta{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
 .mokushi-round-score{font-size:12px;color:var(--muted);white-space:nowrap}
 .mokushi-round-score.tried{color:var(--accent);font-weight:700}
 .mokushi-dup-note{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.mokushi-practice-note{color:var(--muted)}
+.mokushi-rec-badge{display:inline-block;font-size:11px;font-weight:700;color:var(--accent);
+  background:var(--accent-soft);border-radius:999px;padding:1px 7px;margin-right:6px;white-space:nowrap}
+.mokushi-level-note{font-size:12px;color:var(--muted);margin:0 0 8px}
+.mokushi-ring-hint{font-size:12.5px;color:var(--muted);background:var(--accent-soft);border-radius:8px;
+  padding:8px 10px;margin:0 0 10px}
 
 .mokushi-nograde-note{display:block;font-size:11px;color:var(--muted);margin-top:2px}
 
@@ -412,6 +451,7 @@ nav.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2p
 .settings-row .btn{width:auto;display:inline-block;margin-top:0;margin-right:8px;padding:9px 14px;font-size:12.5px}
 .settings-import-label{cursor:pointer;text-align:center}
 .settings-danger{color:var(--wrong);border-color:var(--wrong)}
+.settings-hint{font-size:11.5px;color:var(--muted);line-height:1.5;margin:8px 0 0}
 
 /* ===== けっさんボス(章末バトル・Task 5) ===== */
 .chapter-boss{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);
@@ -471,12 +511,16 @@ function daysBetween(a, b) {
   return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
 }
 
-function srsNext(rec, correct, today, examDate) {
+function srsNext(rec, correct, today, examDate, opts) {
+  const fastStart = !!(opts && opts.fastStart);
+  const isNew = !rec;
   const r = rec ? { ...rec } : { box: 0, due: today, seen: 0, ok: 0 };
   r.seen += 1;
   if (correct) {
     r.ok += 1;
-    r.box = Math.min(r.box + 1, BOXES.length - 1);
+    // 即答スキップ(Task 3): 新規レコード(初見)かつfastStart指定なら箱3から開始する。
+    // 既存レコードがある場合は対象外(通常の+1昇格のまま)
+    r.box = (isNew && fastStart) ? 3 : Math.min(r.box + 1, BOXES.length - 1);
     let interval = BOXES[r.box];
     if (examDate) {
       const remain = daysBetween(today, examDate);
@@ -488,6 +532,51 @@ function srsNext(rec, correct, today, examDate) {
     r.due = today; // 当日中に再出題
   }
   return r;
+}
+
+// ---- 論点単位SRS(Task 2・v5) ----
+// クリア済み論点の復習を「論点1レコード」に圧縮する。復習出題時はその論点のdrills+quizから
+// アプリ側(app.js)がランダム1問に解決するので、engine側はキーの表現とレコード集約/個別降格の
+// 純粋な計算だけを持つ(どのIDが論点に属すかというコンテンツ知識はengineに持ち込まない)。
+function topicSrsKey(topicId) {
+  return "T:" + topicId;
+}
+
+// 論点クリア時に呼ぶ: itemIdsの個別レコード群を集約し、"T:"+topicId のレコード1本にする。
+// box=個別の最小値(レコードが無いitemは0扱い)、due=個別の最短日(無いitemはtoday扱い)、
+// seen/okは合算。集約対象の個別レコードは削除する(非破壊: 新しいオブジェクトを返す)
+function promoteToTopicSrs(srsMap, topicId, itemIds, today) {
+  const next = { ...srsMap };
+  let minBox = null, minDue = null, seenSum = 0, okSum = 0;
+  itemIds.forEach(id => {
+    const rec = srsMap[id];
+    const box = rec ? rec.box : 0;
+    const due = rec ? rec.due : today;
+    seenSum += rec ? rec.seen : 0;
+    okSum += rec ? rec.ok : 0;
+    if (minBox === null || box < minBox) minBox = box;
+    if (minDue === null || due < minDue) minDue = due;
+    delete next[id];
+  });
+  next[topicSrsKey(topicId)] = {
+    box: minBox === null ? 0 : minBox,
+    due: minDue === null ? today : minDue,
+    seen: seenSum,
+    ok: okSum,
+  };
+  return next;
+}
+
+// 論点の復習で誤答した特定の問題を個別トラッキングへ降格する。box0・due=today・seen/ok0の
+// 個別レコードを追加する(既存の個別レコードがあれば同じ内容でリセット)。論点レコード
+// ("T:"+topicId)自体はここでは触らない(他の問題の論点単位の復習はそのまま継続する)。
+// demoted:true を付けるのは、個別レコードの存在だけでは「論点クリア前からの通常の個別
+// SRSレコード」なのか「論点クリア後にここで昇格させた降格レコード」なのか区別できないため
+// (app.js reviewPoolIdsがクリア済み論点の個別idを出題対象に含めてよいかの判定に使う)
+function demoteItem(srsMap, itemId, today) {
+  const next = { ...srsMap };
+  next[itemId] = { box: 0, due: today, seen: 0, ok: 0, demoted: true };
+  return next;
 }
 
 function buildQueue(srsMap, allIds, today, limit, rand = Math.random) {
@@ -601,6 +690,7 @@ function bossDamage(combo) {
 
 const engine = {
   BOXES, srsNext, addDays, daysBetween,
+  topicSrsKey, promoteToTopicSrs, demoteItem,
   buildQueue, classifyError, earnCoins, COIN, updateStreak, nextFreezeGrant,
   shopStage, shopStageFull, STAGE5_RATIO,
   bossDamage,
@@ -28175,9 +28265,14 @@ function defaultState() {
     v: 1,
     srs: {},                    // {itemId: {box,due,seen,ok}}
     log: [],                    // [{id, at(ISO), ok, sec, err}] 生解答ログ
-    cleared: {},                // {topicId: true} 論点クリア(3連続正解)
+    cleared: {},                // {topicId: true} 論点クリア(クリア条件: スピード=2連続20秒以内 / しっかり=3連続)
     scaffold: {},               // {topicId: 0|1|2} 足場段階(0=例を見る,1=穴埋め,2=自力)
     combo: {},                  // {topicId: n} 足場段階2での連続正解数(Task 6)
+    comboFast: {},               // {topicId: bool} 連続正解ストリークで「直前の1問」が20秒以内だったか(Task 3・v5)。
+                                  // clearMode==="speed"のクリア判定(直近2回のsecがどちらも20秒以内)にだけ
+                                  // 使うスライディングウィンドウ用の値。誤答でcomboと一緒にfalseへ戻す
+    clearMode: "speed",          // 論点クリア条件(Task 3・v5)。"speed"(既定)=2連続正解かつ両方20秒以内 /
+                                  // "solid"=従来どおり3連続正解(秒数は問わない)
     streak: { count: 0, lastDate: "", freezes: 2, totalDays: 0, lastGrant: "" },
     goalMin: 5, todaySec: 0, todayDate: "", coinsToday: 0,
     coins: 0, spent: 0, shopItems: [],   // 購入済み設備ID
@@ -28201,7 +28296,21 @@ function defaultState() {
     hintUsed: { day: "", count: 0 }, // 仕訳ドリルの「ヒント」ボタンの日次使用回数(Task 4)。dayが今日でなければ0回扱い
     luckyUntil: null,            // 「きょうの招き猫」発動中のコイン1.2倍が終わる日時(ISO文字列。Task 4)
     luckyLastDay: "",            // 招き猫を発動した日付("YYYY-MM-DD")。1日1回のみ発動可(Task 4)
-    bossWon: {}                  // {chapterId: true} けっさんボス(章末バトル)の勝利済み章(Task 5)
+    bossWon: {},                 // {chapterId: true} けっさんボス(章末バトル)の勝利済み章(Task 5)
+    ringSeen: {},                // {levelId: {1:true,2:true,3:true}} リング構造(Task 1・v5)の完了祝賀を
+                                  // 表示済みのリング番号。級ごとに独立し、一度きり表示するためのフラグ
+    summarySkipped: {},          // {topicId: true} 30秒サマリー画面(Task 4・v5)で「もうわかる→ドリルへ」を
+                                  // 選び、レッスン(お手本パス含む)を丸ごとスキップした論点。浅い理解のまま
+                                  // 進んだ安全網として、この論点の問題の初回SRS登録はfastStart(Task 3・v5)を
+                                  // 適用させずbox=1固定にする(=翌日に最初の復習が来る。詳細はsubmitAnswer内)
+    srsMode: "topic",            // 論点単位SRS(Task 2・v5)。"topic"(既定)=クリア済み論点はまとめて
+                                  // 1件で復習(速い・推奨) / "item"=従来どおり問題ごとに個別追跡。
+                                  // "item"では新規のpromoteToTopicSrsを止めるだけで、既に作られた
+                                  // 論点レコード(T:キー)はそのまま動き続ける(壊さない)
+    srsVersion: 1                // S.srsのスキーマ世代。1=従来(問題ごとの個別レコードのみ)/
+                                  // 2=migrateToTopicSrs()による論点単位SRSへの移行が完了済み。
+                                  // 新規ユーザーも初回起動でmigrateToTopicSrs()を1回通して2にする
+                                  // (S.clearedが空なので実質no-op)。sanitizeStateで型ガードする
   };
 }
 
@@ -28258,7 +28367,7 @@ function sanitizeState(parsed) {
   ["log", "memos", "shopItems", "shopPurchaseLog"].forEach(function (k) {
     if (!Array.isArray(merged[k])) merged[k] = def[k];
   });
-  ["srs", "cleared", "scaffold", "combo", "reflexBest", "mokushiScores", "bossWon"].forEach(function (k) {
+  ["srs", "cleared", "scaffold", "combo", "comboFast", "reflexBest", "mokushiScores", "bossWon", "ringSeen", "summarySkipped"].forEach(function (k) {
     if (typeof merged[k] !== "object" || merged[k] === null || Array.isArray(merged[k])) merged[k] = def[k];
   });
   if (typeof merged.streak !== "object" || merged.streak === null || Array.isArray(merged.streak)) {
@@ -28299,6 +28408,14 @@ function sanitizeState(parsed) {
   }
   if (merged.luckyUntil !== null && typeof merged.luckyUntil !== "string") merged.luckyUntil = def.luckyUntil;
   if (typeof merged.luckyLastDay !== "string") merged.luckyLastDay = def.luckyLastDay;
+  // srsMode/srsVersion(Task 2・v5)。srsModeは決められた2値のみ、srsVersionは数値のみ許可する。
+  // srsVersionをここで壊れたまま通してしまうと migrateToTopicSrs() の==2判定が誤動作し、
+  // 二重集約(既に論点化済みのS.clearedを再度promoteToTopicSrsに通す=実害はないが無駄)や
+  // 移行スキップの誤判定につながるため、他の数値フィールドと同じ方針でガードする
+  if (merged.srsMode !== "topic" && merged.srsMode !== "item") merged.srsMode = def.srsMode;
+  if (typeof merged.srsVersion !== "number" || isNaN(merged.srsVersion)) merged.srsVersion = def.srsVersion;
+  // clearMode(Task 3・v5)は決められた2値のみ許可する。壊れた値/未知の文字列は既定("speed")に戻す
+  if (merged.clearMode !== "speed" && merged.clearMode !== "solid") merged.clearMode = def.clearMode;
   return merged;
 }
 
@@ -28329,11 +28446,57 @@ function importData(json) {
     var parsed = JSON.parse(json);
     if (!parsed || typeof parsed !== "object" || parsed.v !== 1) return false;
     S = sanitizeState(parsed);
+    migrateToTopicSrs(); // 旧データ(srsVersion<2)を論点単位SRSへ移行してから保存する
     save();
     return true;
   } catch (e) {
     return false;
   }
+}
+
+// 論点単位SRSへの一括移行(Task 2・v5)。S.srsVersion===2 なら何もしない(以降の起動では
+// スキップされる)。クリア済み論点(S.cleared)ごとに、その論点のdrill/quiz idの個別レコード群を
+// eng.promoteToTopicSrsで論点レコード1本("T:"+topicId)へ集約する。
+// 弱点保護: S.logの直近30日以内に誤答した問題idは集約対象から除外し、個別レコードのまま残す
+// (せっかく苦手だと分かっている問題を、論点単位の粗い管理に埋もれさせない)。除外した個別
+// レコードには demoted:true を付け(box/dueは変更しない)、reviewPoolIdsの「クリア済み+
+// T:レコードあり」経路でも出題対象に乗るようにする(付けないとT:レコード生成後は出題プール
+// から漏れて保護が名ばかりになるため)。box>=2まで回復すれば通常どおり自動で削除され、
+// 論点単位の管理へ一本化される
+// findTopic()はensureIndex()経由で全級を横断するので、S.levelにかかわらずS.clearedの
+// 全論点(2級・1級のクリア済み論点も含む)が対象になる
+function migrateToTopicSrs() {
+  if (S.srsVersion >= 2) return; // 将来srsVersionが3以上になっても再実行しない(旧===2は3以上を素通ししてしまうバグだった)
+  var eng = window.Boki.engine;
+  var today = todayStr();
+  var cutoff = eng.addDays(today, -30);
+  var recentMiss = {};
+  (S.log || []).forEach(function (e) {
+    if (e && e.ok === false && typeof e.day === "string" && e.day >= cutoff) recentMiss[e.id] = true;
+  });
+  Object.keys(S.cleared || {}).forEach(function (topicId) {
+    if (!S.cleared[topicId]) return;
+    var topic = findTopic(topicId);
+    if (!topic) return; // コンテンツに存在しない論点id(旧データの残骸)は無視
+    var allItemIds = (topic.drills || []).map(function (d) { return d.id; })
+      .concat((topic.quiz || []).map(function (q) { return q.id; }));
+    var toPromote = allItemIds.filter(function (id) { return !recentMiss[id]; });
+    // 記録(S.srs[id])が無いidはpromoteToTopicSrsに渡さない。渡すとengine側でbox0/due=today
+    // 扱いされ、未着手だっただけのidのせいで論点レコードの間隔が今日に平坦化されてしまう
+    // (このクリア済み論点を今まさに解いたばかりの問題と誤認する形になり、せっかく育った
+    // 間隔がクリアのたびにリセットされるバグだった)
+    var recorded = toPromote.filter(function (id) { return S.srs[id]; });
+    // 弱点保護で集約から除外した個別レコード(recentMiss かつ記録あり)には demoted:true を
+    // 付けて残す。box/dueは書き換えない(せっかく育った間隔・誤答直後のboxをそのまま生かす)
+    var protectedIds = allItemIds.filter(function (id) { return recentMiss[id] && S.srs[id]; });
+    protectedIds.forEach(function (id) { S.srs[id].demoted = true; });
+    if (!recorded.length) return; // 集約対象の記録が1件も無ければ論点レコードは作らない
+    // (T:レコードが無くてもreviewPoolIds側は個別idをそのまま出題対象に含めるので、
+    // ここで作らないことと矛盾しない)
+    S.srs = eng.promoteToTopicSrs(S.srs, topicId, recorded, today);
+  });
+  S.srsVersion = 2;
+  save();
 }
 
 // 端末ローカル日付を "YYYY-MM-DD" で返す(engine.addDaysと同じローカル要素での組み立て。
@@ -28416,11 +28579,22 @@ function activateLuckyCat() {
   toast("🐱 きょうの招き猫が発動しました。24時間コイン獲得が1.2倍になります");
 }
 
+// 論点単位SRS(Task 2・v5): startReviewQueueがT:キー(論点レコード)を実問題IDへ解決したとき、
+// 「このセッション中このIDのSRS更新はT:キーへ書く」という対応を一時的に持つマップ。
+// キーは実ID・値は"T:"+topicId。startReviewQueueがセッション開始のたびに作り直す
+// (通常のドリル/クイズ/けっさんボスなど、レビューキュー経由でない解答では常に空=素通し)
+var _reviewSrsKeyMap = {};
+// 論点単位SRS(Task 2・v5): 論点キー("T:"+topicId)の解決で直前に選んだ実idを覚えておき、
+// 次にその論点キーを解決するとき(別の日の別セッションでも)同じ問題が連続して選ばれるのを
+// 避ける(pickPoolが2件以上あるときだけ有効。1件しかなければ避けようがないので無視する)
+var _lastTopicPick = {};
+
 // log追記+srs更新+coins加算+todaySec加算を一括で行う唯一の窓口
 // halveCoins(Task 4): 仕訳ドリルでその問題にヒントを使ったときtrueを渡す。獲得コインを半減させる
-function recordAnswer(id, ok, sec, err, halveCoins) {
+function recordAnswer(id, ok, sec, err, halveCoins, opts) {
   var eng = window.Boki.engine;
   var today = todayStr();
+  opts = opts || {};
 
   if (S.todayDate !== today) {
     S.todayDate = today;
@@ -28428,7 +28602,12 @@ function recordAnswer(id, ok, sec, err, halveCoins) {
     S.coinsToday = 0; // おみせの「今日の帳簿」用(Task 10)。todaySecと同じ日付ロールオーバーで一緒にリセットする
   }
 
-  var firstView = !S.srs[id]; // このitemを一度も解いたことがないか
+  // 論点単位SRS(Task 2・v5): idがこのセッションでT:キーから解決された実問題なら、
+  // SRSの読み書き先は実ID自身ではなく論点レコード("T:"+topicId)にする
+  // (論点クリア時にpromoteToTopicSrsで個別レコードは削除済みのため)
+  var srsKey = _reviewSrsKeyMap[id] || id;
+
+  var firstView = !S.srs[srsKey]; // このitem(または論点)を一度も解いたことがないか
   var repeatToday = S.log.some(function (e) {
     return e.id === id && e.day === today;
   });
@@ -28439,7 +28618,30 @@ function recordAnswer(id, ok, sec, err, halveCoins) {
   }
   S.totalAnswers += 1;
 
-  S.srs[id] = eng.srsNext(S.srs[id] || null, ok, today, S.examDate);
+  // 即答スキップ(Task 3・v5): 呼び出し側がfastStartを指定していても、T:キー経由(論点復習・
+  // srsKey!==id)には適用しない(復習には無関係のため、ここで必ず無効化する二重防御)
+  var fastStart = !!opts.fastStart && srsKey === id;
+  S.srs[srsKey] = eng.srsNext(S.srs[srsKey] || null, ok, today, S.examDate, { fastStart: fastStart });
+  var ownerTopicId = drillTopicId(id) || quizTopicId(id);
+  if (srsKey !== id && !ok) {
+    // 論点レビューでの誤答: その問題だけ個別トラッキングへ降格する(論点レコードは残り、
+    // 他の問題の論点単位の復習はそのまま継続する)
+    S.srs = eng.demoteItem(S.srs, id, today);
+  } else if (srsKey === id && !ok && ownerTopicId && S.srs[eng.topicSrsKey(ownerTopicId)]) {
+    // 論点が既に圧縮済み(T:レコードあり)なのに、復習キューを経由せず直接その問題を解いて
+    // 誤答した場合(とっくん・けっさんボスなど)。demoted:trueを付けないとreviewPoolIdsの
+    // 「クリア済み+T:レコードあり」経路では個別idが出題対象に含まれず、この誤答が
+    // 復習スケジュールから漏れてしまう。box/dueは直前のsrsNextが書いた値をそのまま使う
+    // (demoteItemのように0へリセットしない)
+    S.srs[id].demoted = true;
+  }
+  // 誤答昇格中の個別レコード(=論点は既にクリア済みでT:レコードを持つが、このidだけ
+  // 個別に追跡中)がbox>=2まで回復したら削除し、論点単位の管理へ一本化する。
+  // T:レコードが無い論点(srsMode="item"のまま一度も集約されていない論点)ではこの分岐に
+  // 入らないため、従来どおりの個別追跡(削除なし)を誤って壊すことはない
+  if (ok && ownerTopicId && S.srs[eng.topicSrsKey(ownerTopicId)] && S.srs[id] && S.srs[id].box >= 2) {
+    delete S.srs[id];
+  }
 
   var coins = eng.earnCoins({ firstView: firstView, correct: ok, repeatToday: repeatToday });
   coins = applyCoinEffects(coins, !!halveCoins);
@@ -28517,6 +28719,7 @@ function goalCelebrateHtml() {
 }
 
 load();
+migrateToTopicSrs(); // 論点単位SRS(Task 2・v5)。srsVersion===2ならno-op
 if (!storageAvailable) showStorageWarning();
 applyTheme();
 
@@ -29068,6 +29271,10 @@ function closeSession() {
   if (typeof _sessionCleanup === "function") _sessionCleanup(); // 例: ミニテストのタイマー解除
   _sessionCleanup = null;
   _sessionHandler = null;
+  // 論点単位SRS(Task 2・v5): 「今日の復習」セッション限りの実ID→論点キー対応をここで必ず捨てる。
+  // 捨てないと、セッション終了後にとっくん/けっさんボス/まなぶ等で同じ実idへ正常に回答しても、
+  // 古い対応が生き残っていてSRSの書き込み先が誤って論点レコード(T:)へリダイレクトされてしまう
+  _reviewSrsKeyMap = {};
   refreshActiveView(); // Task 7: セッション終了後、いま見えているタブ(today/learn)を再描画して反映する
 }
 
@@ -29090,6 +29297,46 @@ function markConfusing(itemId, screenIdx) {
   toast("メモを保存しました。ありがとうございます。");
 }
 
+/* ===== 30秒サマリー(自動合成・執筆なし。Task 4・v5) =====
+   topicSummaryHtml(topic): 論点を開いたときに最初に見せる要約カードのHTMLを、既存コンテンツから
+   そのまま組み立てて返す(新規の文章は一切書かない)。構成は4つ固定:
+   ①論点タイトル ②lesson[0].t(導入文) ③代表仕訳(drills[0]のentriesを既存の仕訳テーブルで。
+   ドリルを持たない論点=クイズのみの論点はquiz[0]の正解選択肢の文をカード表示にフォールバック。
+   どちらも無ければこの節は出さない=防御) ④「この論点の合言葉」= 最終レッスン画面のeasy、
+   無ければtの先頭80字(超過分は"…"で示す)。figはここでは合成しない(シンプル維持)。 */
+function topicSummaryHtml(topic) {
+  var html = '<h3 class="summary-title">' + esc(topic.title) + '</h3>';
+
+  var intro = (topic.lesson && topic.lesson[0]) ? topic.lesson[0].t : "";
+  if (intro) html += '<p class="lesson-text">' + esc(intro) + '</p>';
+
+  if (topic.drills && topic.drills.length && topic.drills[0] && topic.drills[0].entries) {
+    html += '<p class="drill-compare-label">代表的な仕訳</p>' + journalTable(topic.drills[0].entries);
+  } else if (topic.quiz && topic.quiz.length && topic.quiz[0] && Array.isArray(topic.quiz[0].opts)) {
+    var q0 = topic.quiz[0];
+    var answerText = q0.opts[q0.ans];
+    if (answerText != null) {
+      html += '<p class="drill-compare-label">代表的なポイント</p>' +
+        '<div class="easy-panel">' + esc(answerText) + '</div>';
+    }
+  }
+
+  var lastLesson = (topic.lesson && topic.lesson.length) ? topic.lesson[topic.lesson.length - 1] : null;
+  if (lastLesson) {
+    var slogan = lastLesson.easy;
+    if (!slogan) {
+      var t = lastLesson.t || "";
+      slogan = t.length > 80 ? (t.slice(0, 80) + "…") : t;
+    }
+    if (slogan) {
+      html += '<p class="drill-compare-label">この論点の合言葉</p>' +
+        '<div class="summary-slogan">' + esc(slogan) + '</div>';
+    }
+  }
+
+  return html;
+}
+
 /* ===== レッスンプレイヤー(Task 6) ===== */
 
 function startLesson(topicId) {
@@ -29100,6 +29347,27 @@ function startLesson(topicId) {
 
   var idx = 0;
   var easyOpen = false;
+  // 30秒サマリー(Task 4・v5): レッスンより先にサマリー画面を必ず1枚はさむ。
+  // summaryStage=falseになった後は従来どおりのレッスン描画(render/onClick)がそのまま動く
+  var summaryStage = true;
+  // 未着手(=足場段階が一度も設定されておらず、かつ未クリア)のときだけ「もうわかる→ドリルへ」で
+  // レッスンの完全スキップを許可する。着手済み/クリア済みで再訪したときはボタン文言を変え、
+  // 「ドリルへ」はスキップ扱い(S.summarySkipped)にはしない(=すでに一度学んでいるため安全網は不要)
+  var isFresh = S.scaffold[topicId] === undefined && !S.cleared[topicId];
+
+  function drillIdsOf() { return (topic.drills || []).map(function (d) { return d.id; }); }
+
+  function renderSummaryScreen() {
+    var drillBtnLabel = isFresh ? "もうわかる → ドリルへ" : "ドリルへ";
+    var lessonBtnLabel = isFresh ? "じっくり学ぶ →" : "レッスンを読む";
+    body.innerHTML =
+      '<p class="summary-badge">⚡30秒サマリー</p>' +
+      topicSummaryHtml(topic) +
+      '<div class="nav-row">' +
+        '<button type="button" class="btn ghost" data-act="summary-drill">' + drillBtnLabel + '</button>' +
+        '<button type="button" class="btn" data-act="summary-lesson">' + lessonBtnLabel + '</button>' +
+      '</div>';
+  }
 
   function render() {
     var item = topic.lesson[idx];
@@ -29129,13 +29397,33 @@ function startLesson(topicId) {
     var t = e.target.closest("[data-act]");
     if (!t) return;
     var act = t.dataset.act;
+    if (summaryStage) {
+      if (act === "summary-drill") {
+        var drillIds = drillIdsOf();
+        if (isFresh) {
+          // もうわかる→ドリルへ(Task 4・v5): レッスン(お手本パス含む)を丸ごと飛ばし、
+          // scaffoldが未設定ならいきなり1(あなうめ)から始める。浅い理解のまま進んだ安全網として
+          // この論点をS.summarySkippedへ記録する(初回SRS登録のfastStart抑制はsubmitAnswer側で参照)
+          if (S.scaffold[topicId] === undefined) S.scaffold[topicId] = 1;
+          S.summarySkipped[topicId] = true;
+          save();
+        }
+        if (drillIds.length) startDrillSession(drillIds, { topicId: topic.id });
+        else closeSession();
+      } else if (act === "summary-lesson") {
+        summaryStage = false;
+        idx = 0; easyOpen = false;
+        render();
+      }
+      return;
+    }
     if (act === "easy-toggle") { easyOpen = !easyOpen; render(); }
     else if (act === "confusing") { markConfusing(topic.id, idx); }
     else if (act === "back") { if (idx > 0) { idx--; easyOpen = false; render(); } }
     else if (act === "next") {
       if (idx < topic.lesson.length - 1) { idx++; easyOpen = false; render(); }
       else {
-        var drillIds = (topic.drills || []).map(function (d) { return d.id; });
+        var drillIds = drillIdsOf();
         if (drillIds.length) startDrillSession(drillIds, { topicId: topic.id });
         else closeSession();
       }
@@ -29143,7 +29431,7 @@ function startLesson(topicId) {
   }
 
   _sessionHandler = onClick;
-  render();
+  renderSummaryScreen();
 }
 
 /* ===== 仕訳ドリル(Task 6) =====
@@ -29151,8 +29439,11 @@ function startLesson(topicId) {
    1=穴埋め(科目は正解のまま表示、金額だけテンキー入力) 2=全部自力(科目もテンキー上の選択肢から自分で組む)
    opts: { topicId, level } — topicIdを渡すとその論点のscaffold段階を自動参照する。
    levelを明示すればscaffold段階を無視して強制できる(将来の複合復習キュー等向け)。
-   3連続正解(level===2に限る)で S.cleared[topicId]=true。連続数は S.combo[topicId] に保持し、
-   どのセッション経由でも(ドリルidから逆引きしたtopicIdに対して)同じルールで加算する。 */
+   連続正解(level===2に限る)で S.cleared[topicId]=true。連続数は S.combo[topicId] に保持し、
+   どのセッション経由でも(ドリルidから逆引きしたtopicIdに対して)同じルールで加算する。
+   必要な連続数はS.clearMode(Task 3・v5)で変わる: "speed"(既定)=2連続かつ直近2回のsecがどちらも
+   20秒以内(直前の1問が20秒以内だったかをS.comboFast[topicId]に保持するスライディングウィンドウ判定。
+   途中に20秒超があっても、そのあと2問続けて20秒以内ならクリアできる) / "solid"=従来どおり3連続(秒数不問)。 */
 
 // 足場3段階UXの表示専用ヘルパー(進行ルールには関与しない)。
 // ドリル要約画面とまなぶ画面の両方から使うため、S.scaffold/S.combo/S.clearedの見た目の
@@ -29445,7 +29736,9 @@ function startDrillSession(ids, opts) {
           : '<button type="button" class="btn" data-act="continue-topic">もういちど あなうめに挑戦 →</button>';
         hasContinue = true;
       } else if (level === 2 && !S.cleared[opts.topicId]) {
-        var remain = Math.max(1, 3 - (S.combo[opts.topicId] || 0));
+        // クリアに必要な連続正解数はS.clearModeで変わる(speed=2/solid=3。Task 3・v5)
+        var clearTarget = S.clearMode === "solid" ? 3 : 2;
+        var remain = Math.max(1, clearTarget - (S.combo[opts.topicId] || 0));
         continueHtml = '<p class="scaffold-next-hint">クリアまで あと' + remain + '問連続正解</p>' +
           '<button type="button" class="btn" data-act="continue-topic">つづけて挑戦 →</button>';
         hasContinue = true;
@@ -29454,7 +29747,7 @@ function startDrillSession(ids, opts) {
 
     if (justCleared) {
       html += '<div class="celebrate"><div class="emoji">🎉</div><p><strong>論点クリア!</strong></p>' +
-        '<p>3連続正解できました。おめでとうございます。</p></div>';
+        '<p>' + (S.clearMode === "speed" ? "スピードクリア!2連続で正解できました" : "3連続で正解できました") + '。おめでとうございます。</p></div>';
     } else {
       html += continueHtml;
     }
@@ -29530,11 +29823,21 @@ function startDrillSession(ids, opts) {
     if (ok) correctCount++; else allCorrectPass = false;
     if (opts.minitest) okList.push(ok);
 
-    var rec = recordAnswer(drill.id, ok, sec, ok ? null : result, hintUsedThisQ);
+    // 即答スキップ(Task 3・v5): 自力(level2)・初見(このidのS.srsレコードがまだ無い)・
+    // 15秒以内の正解、という条件をここで判定する。T:キー経由(論点復習)はrecordAnswer側で
+    // 必ず無効化されるため、ここではlevel/初見/秒数/正誤だけを見ればよい
+    // 30秒サマリーからのスキップ論点(Task 4・v5)は、浅い理解のまま進んだ安全網として
+    // fastStartを常に無効化し、初回SRS登録をbox=1固定(通常の+1昇格)にする。
+    // srsNextはisNew(=このidが初見)のときしかfastStartを見ないため、この抑制は
+    // 2回目以降の解答には無関係(実害なく素通りする)
+    var fastStartTopicId = opts.topicId || drillTopicId(drill.id);
+    var fastStartSuppressed = !!(fastStartTopicId && S.summarySkipped[fastStartTopicId]);
+    var fastStart = level === 2 && ok && sec <= 15 && !S.srs[drill.id] && !fastStartSuppressed;
+    var rec = recordAnswer(drill.id, ok, sec, ok ? null : result, hintUsedThisQ, { fastStart: fastStart });
     lastCoins = rec.coins; coinTotal += rec.coins;
     lastResult = { ok: ok, type: result, userEntries: userEntries };
 
-    // 3連続正解での論点クリアは「全部自力(level 2)」で解いたときだけ数える。
+    // クリア条件(スピード=2連続20秒以内 / しっかり=3連続)は「全部自力(level 2)」で解いたときだけ数える。
     // さらに、とっくん(章別特訓/ランダム/ミニテスト)は全論点を横断して出題するため、
     // レッスンを一度も開いていない(未着手)論点まで誤ってクリア扱いにしないよう、
     // 「論点セッション(opts.topicId)」または「その論点が着手済み
@@ -29547,9 +29850,37 @@ function startDrillSession(ids, opts) {
       if (tId) {
         if (ok) {
           S.combo[tId] = (S.combo[tId] || 0) + 1;
-          if (S.combo[tId] >= 3 && !S.cleared[tId]) S.cleared[tId] = true;
+          // スピードクリア(Task 3・v5): 「直近2回のsecがどちらも20秒以内」がクリア条件のため、
+          // S.comboFast[tId]は連続正解ストリークの中で"直前の1問"が20秒以内だったかだけを持つ
+          // (ストリーク開始からの累積ANDではない)。今回の判定は「直前の1問」×「今回」の
+          // スライディングウィンドウで行い、途中に20秒超があっても、その後2問続けて20秒以内なら
+          // クリアできる(=違反した問の次でクリア要件を満たすには、さらに1問=3問目が必要になる)
+          var prevWithin20 = !!S.comboFast[tId];
+          var within20 = sec <= 20;
+          // クリア条件(S.clearMode): "speed"(既定)=2連続正解かつ直近2回とも20秒以内 /
+          // "solid"=従来どおり3連続正解(秒数は問わない)。未知の値は既定(speed)扱い
+          var clearMode = S.clearMode === "solid" ? "solid" : "speed";
+          var comboCleared = clearMode === "speed"
+            ? (S.combo[tId] >= 2 && prevWithin20 && within20)
+            : (S.combo[tId] >= 3);
+          S.comboFast[tId] = within20; // 次回の判定のため「直前の1問」を今回の結果で更新する
+          if (comboCleared && !S.cleared[tId]) {
+            S.cleared[tId] = true;
+            // 論点単位SRS(Task 2・v5): S.srsMode!=="item"のときだけ、この論点のdrill/quiz
+            // 全idの個別レコードを論点レコード1本("T:"+tId)へ集約する。"item"モードでは
+            // 新規の集約を止め、従来どおり個別レコードのまま復習させる
+            if (S.srsMode !== "item") {
+              var clearedTopic = findTopic(tId);
+              var clearedItemIds = clearedTopic
+                ? (clearedTopic.drills || []).map(function (d) { return d.id; })
+                  .concat((clearedTopic.quiz || []).map(function (q) { return q.id; }))
+                : [];
+              S.srs = eng.promoteToTopicSrs(S.srs, tId, clearedItemIds, todayStr());
+            }
+          }
         } else {
           S.combo[tId] = 0;
+          S.comboFast[tId] = false;
         }
         save();
       }
@@ -30140,14 +30471,43 @@ function isStartedTopic(topicId) {
   return S.scaffold[topicId] !== undefined || !!S.cleared[topicId];
 }
 
-// 指定した級(levelId)のdrill/quiz idのうち、親論点が着手済みのものだけを返す。
-// 新規論点は必ずstartLesson(足場0→1→2)を通す設計のため、今日のキュー
-// (buildQueueの「新しい問題」バックフィル対象)には未着手論点のidを混ぜてはいけない。
-// kind: 省略=drill+quiz(ホームの復習キュー用) / "drill"=drillのみ(とっくん用)
-function startedIds(levelId, kind) {
+// 「今日の復習」(buildQueueの母集合)専用のid一覧(Task 2・v5)。クリア済み論点のidを
+// 個別のまま渡さず、論点キー("T:"+topicId。1論点1件)に差し替える。
+// - 論点キーへ差し替えるのは、その論点に既にT:レコードがあるとき(hasTopicRec)だけ。
+//   T:レコードはpromoteToTopicSrs経由(論点クリア時 or マイグレーション)でのみ作られ、
+//   マイグレーション側は記録が1件も無ければT:レコードを作らずreturnするため、
+//   「クリア済みだがT:レコードが無い」論点は集約対象0件だった論点であり、ここで
+//   論点キーを投機的に足すと個別レコードも無いまま出題プールに混入してしまう
+//   (誤って復習間隔をリセットする移行バグと表裏の問題だったため、生成側と一貫させる)
+// - 誤答昇格中の個別レコード(demoteItemが作った、demoted===trueの個別id)は、論点キーと
+//   "併記"で出題対象に含める(弱点はその問題だけ個別に、それ以外は論点単位でまとめて出す)。
+//   demoted===trueでない個別レコードは、クリア済み論点の圧縮済みidが紛れ込んだだけの
+//   信頼できない残骸なので出題プールには含めない(圧縮を維持する)
+// - hasTopicRecがfalse(T:レコードが無い)のクリア済み論点は、srsModeを問わず個別idを
+//   そのままプールに入れる(pre-v5と同じ挙動)。該当するのは
+//   ①全問弱点保護(migrateToTopicSrs)で集約対象が1件も無かった論点
+//   ②itemモードでクリアされ、一度もpromoteToTopicSrsを通っていない論点
+//   のいずれも「論点単位の圧縮が未実施」であり、T:キーを出していないので個別idを
+//   そのままプールに入れても二重カウントにはならない
+function reviewPoolIds(levelId) {
   var info = levelDrillQuizIds(levelId);
-  var ids = (kind === "drill") ? info.drillIds : info.allIds;
-  return ids.filter(function (id) { return isStartedTopic(info.idToTopic[id]); });
+  var ids = info.allIds;
+  var eng = window.Boki.engine;
+  var pool = [];
+  var addedTopicKey = {};
+  ids.forEach(function (id) {
+    var tId = info.idToTopic[id];
+    if (!isStartedTopic(tId)) return;
+    var tKey = eng.topicSrsKey(tId);
+    var hasTopicRec = !!S.srs[tKey];
+    if (S.cleared[tId] && hasTopicRec) {
+      if (!addedTopicKey[tKey]) { pool.push(tKey); addedTopicKey[tKey] = true; }
+      if (S.srs[id] && S.srs[id].demoted) pool.push(id); // 誤答昇格中の個別トラッキングのみ
+      return;
+    }
+    pool.push(id); // 未クリア、またはT:レコード無し(集約対象0件/itemモード未集約)のクリア済み論点の個別追跡
+  });
+  return pool;
 }
 
 // いま選択中の級(S.level)の級オブジェクト。見つからなければnull
@@ -30212,16 +30572,60 @@ function topicsByPriority(lv) {
   return rows;
 }
 
+/* ----- リング構造(コア→合格ライン→全網羅)(Task 1・v5) -----
+   PRIORITYの重要度をそのまま学習の同心円構造に対応づける:
+   Ring1=🎯コア(priorityOf===="top") / Ring2=✅合格ライン(==="high") / Ring3=📚全網羅(標準)。
+   「最短で合格ラインの土台(コア)を固め、そこから広げる」という導線をホーム誘導と
+   まなぶ「合格に効く順」の見出しの両方で共有するための基盤 */
+var RING_META = {
+  1: { emoji: "🎯", label: "コア" },
+  2: { emoji: "✅", label: "合格ライン" },
+  3: { emoji: "📚", label: "全網羅" }
+};
+function ringOf(topicId) {
+  var p = priorityOf(topicId);
+  return p === "top" ? 1 : (p === "high" ? 2 : 3);
+}
+// 指定した級の各リングの{cleared,total}を、そのリングに属する論点だけの差分集合で数える
+// (ring1+ring2+ring3のtotalを足すと級の全論点数に一致し、二重計上はない)。
+// current = 3リングのうち最小の未完(cleared<total)番号。該当論点が0件のリング(total===0)は
+// 完了扱いとみなして次のリングへ進める(1級のようにtop/highの構成比が違う級でも必ず成立させるため)
+function ringProgress(levelId) {
+  var content = (typeof CONTENT !== "undefined") ? CONTENT : (window.Boki && window.Boki.CONTENT);
+  var lv = ((content && content.levels) || []).filter(function (l) { return l.id === levelId; })[0];
+  var rings = { 1: { cleared: 0, total: 0 }, 2: { cleared: 0, total: 0 }, 3: { cleared: 0, total: 0 } };
+  ((lv && lv.chapters) || []).forEach(function (ch) {
+    (ch.topics || []).forEach(function (tp) {
+      var r = rings[ringOf(tp.id)];
+      r.total++;
+      if (S.cleared[tp.id]) r.cleared++;
+    });
+  });
+  var current = 1;
+  if (rings[1].cleared >= rings[1].total) {
+    current = 2;
+    if (rings[2].cleared >= rings[2].total) current = 3;
+  }
+  return { ring1: rings[1], ring2: rings[2], ring3: rings[3], current: current };
+}
+
 // S.level(現在選択中の級)の中で、まだクリアしていない最初の論点を返す。
 // 並び順は S.learnSort に追従する("chapter"=章の出現順 / "priority"=合格に効く順)ので、
-// まなぶ画面で「合格に効く順」を選んでいるあいだはホームの「次のおすすめ」も同じ順で進む
+// まなぶ画面で「合格に効く順」を選んでいるあいだはホームの「次のおすすめ」も同じ順で進む。
+// 「合格に効く順」のときはさらに現在リング(最小の未完リング)の中の未クリア論点に限定し、
+// リング誘導(コア→合格ライン→全網羅)をホームにも反映する(「章の順」ユーザーは従来どおり)
 function nextUnclearedTopic() {
   var content = (typeof CONTENT !== "undefined") ? CONTENT : (window.Boki && window.Boki.CONTENT);
   var lv = ((content && content.levels) || []).filter(function (l) { return l.id === (S.level || 3); })[0];
   if (!lv) return null;
   if (S.learnSort === "priority") {
     var rows = topicsByPriority(lv);
-    for (var i = 0; i < rows.length; i++) if (!S.cleared[rows[i].topic.id]) return rows[i].topic;
+    var rp = ringProgress(lv.id);
+    var ringRows = rows.filter(function (row) { return ringOf(row.topic.id) === rp.current; });
+    for (var i = 0; i < ringRows.length; i++) if (!S.cleared[ringRows[i].topic.id]) return ringRows[i].topic;
+    // 通常はcurrentリング内に必ず未クリアが1件はあるはずだが、
+    // 想定外の状態(データ不整合等)に備えて全体探索へフォールバックする
+    for (var j = 0; j < rows.length; j++) if (!S.cleared[rows[j].topic.id]) return rows[j].topic;
     return null;
   }
   for (var ci = 0; ci < (lv.chapters || []).length; ci++) {
@@ -30256,7 +30660,43 @@ function startReviewQueue(opts) {
   var eng = window.Boki.engine;
   var info = levelDrillQuizIds(S.level);
   var today = todayStr();
-  var queue = opts.precomputedQueue || eng.buildQueue(S.srs, startedIds(S.level), today, 20, Math.random);
+  var queue = opts.precomputedQueue || eng.buildQueue(S.srs, reviewPoolIds(S.level), today, 20, Math.random);
+  if (!queue.length) { toast("復習する項目がありません"); return; }
+
+  // 論点単位SRS(Task 2・v5): キューに混ざる論点キー("T:"+topicId)を、その論点のdrills+quizから
+  // ランダムに選んだ実問題1問へ解決する。_reviewSrsKeyMapにこのセッション限りの
+  // 「実ID→論点キー」対応を控え、recordAnswerがSRSの読み書き先を論点レコードへ差し替えるのに使う
+  // (queue由来ではない=既に実idそのものだった要素はそのまま通す)
+  _reviewSrsKeyMap = {};
+  // 解決前のキューに既に実idとして含まれているもの(例: 同じ論点の誤答昇格中の個別レコード
+  // demoted:trueのid)は、T:キー解決の抽選対象から外す。外さないと同じ問題がキュー内に
+  // 二重に(論点経由と個別idと)出てしまう(resolveのたびにこの後の解決分も追記していく)
+  var queueIdSet = {};
+  queue.forEach(function (key) {
+    if (key.slice(0, 2) !== "T:") queueIdSet[key] = true;
+  });
+  queue = queue.map(function (key) {
+    if (key.slice(0, 2) !== "T:") return key;
+    var tId = key.slice(2);
+    var topic = findTopic(tId);
+    var fullPool = topic
+      ? (topic.drills || []).map(function (d) { return d.id; }).concat((topic.quiz || []).map(function (q) { return q.id; }))
+      : [];
+    if (!fullPool.length) return null; // データ不整合の防御(通常は起こらない)
+    var pickPool = fullPool.filter(function (id) { return !queueIdSet[id]; });
+    if (!pickPool.length) pickPool = fullPool; // 全滅時は絞り込みをあきらめて元のプールに戻す(0問より重複のほうがマシ)
+    // 直前セッションでこの論点キーから選んだidと連続で同じにならないようにする(pool>1のみ)
+    var avoid = _lastTopicPick[key];
+    if (avoid !== undefined && pickPool.length > 1) {
+      var rotated = pickPool.filter(function (id) { return id !== avoid; });
+      if (rotated.length) pickPool = rotated;
+    }
+    var pick = pickPool[Math.floor(Math.random() * pickPool.length)];
+    _lastTopicPick[key] = pick;
+    _reviewSrsKeyMap[pick] = key;
+    queueIdSet[pick] = true; // 以降の別T:キー解決や重複チェックからもこのidを除外する
+    return pick;
+  }).filter(function (id) { return id !== null; });
   if (!queue.length) { toast("復習する項目がありません"); return; }
 
   var drillPart = queue.filter(function (id) { return info.drillSet[id]; });
@@ -30332,6 +30772,62 @@ function backupReminderHtml() {
     '</div>';
 }
 
+// リング構造(Task 1・v5)の網羅率メーターカード。「いまのリング」+3リング分の小さな
+// 累積表示(実際はring1/2/3それぞれ排他集合)。S.learnSortの値にかかわらず常時表示する
+// (リング誘導自体は「合格に効く順」選択時のみnextUnclearedTopicに作用するが、
+// メーターは現在地の可視化として両モード共通で見せる)
+function ringMeterHtml() {
+  var lvId = S.level || 3;
+  var rp = ringProgress(lvId);
+  var totalTopics = rp.ring1.total + rp.ring2.total + rp.ring3.total;
+  if (!totalTopics) return ""; // 論点が1つも無い級(準備中)では出さない
+  var curMeta = RING_META[rp.current];
+  var curData = rp["ring" + rp.current];
+  var itemsHtml = [1, 2, 3].map(function (n) {
+    var meta = RING_META[n];
+    var d = rp["ring" + n];
+    var pct = d.total ? Math.round((d.cleared / d.total) * 100) : 100;
+    return '<div class="ring-meter-item' + (n === rp.current ? " current" : "") + '">' +
+      '<div class="ring-meter-row"><span class="ring-meter-label">' + meta.emoji + meta.label + '</span>' +
+        '<span class="ring-meter-count">' + d.cleared + '/' + d.total + '</span></div>' +
+      '<div class="bar"><div class="bar-fill" style="width:' + pct + '%"></div></div>' +
+      '</div>';
+  }).join("");
+  return '<div class="card today-card ring-meter-card">' +
+    '<h3>いまのリング</h3>' +
+    '<p class="ring-meter-current">' + curMeta.emoji + curMeta.label + ' ' + curData.cleared + '/' + curData.total + '</p>' +
+    '<div class="ring-meter-list">' + itemsHtml + '</div>' +
+    '</div>';
+}
+
+// リング完了の祝賀カード(一度きり表示。Task 1・v5)。renderToday呼び出しのたび(=次回ホーム表示時)に
+// 判定するだけの単純な実装(brief記載の2案のうち簡易な方を採用)。S.ringSeenに未記録の完了リングが
+// あれば1枚だけ祝賀を返し、その場でseenを記録・saveする(ring1→ring2→ring3の順に1つだけ検出)
+var RING_CLEAR_MSG = {
+  1: "コアを制覇!ここまでで合格ラインの土台ができました。次は✅合格ラインへ",
+  2: "合格ラインを制覇!模試に挑戦する準備ができました",
+  3: "全網羅達成!"
+};
+function ringCelebrateHtml() {
+  var lvId = S.level || 3;
+  var rp = ringProgress(lvId);
+  if (!S.ringSeen[lvId]) S.ringSeen[lvId] = {};
+  var seen = S.ringSeen[lvId];
+  for (var n = 1; n <= 3; n++) {
+    var d = rp["ring" + n];
+    if (d.total > 0 && d.cleared >= d.total && !seen[n]) {
+      seen[n] = true;
+      save();
+      // Ring2(合格ライン)達成時のみ、模試(本試験チャレンジ)への導線ボタンを添える(Task 5)
+      var mokushiBtnHtml = (n === 2)
+        ? '<button type="button" class="btn" data-act="goto-mokushi">🏆模試に挑戦する</button>'
+        : "";
+      return '<div class="celebrate ring-celebrate"><div class="emoji">🎉</div><p><strong>' + RING_CLEAR_MSG[n] + '</strong></p>' + mokushiBtnHtml + '</div>';
+    }
+  }
+  return "";
+}
+
 /* ----- renderToday() ----- */
 var _todayReviewQueue = null; // 表示中のキューを保持し、クリック時に同じキューを使用する
 function renderToday() {
@@ -30350,8 +30846,10 @@ function renderToday() {
   // 新規論点は必ずstartLesson(足場0→1→2)を通す設計のため、buildQueueに渡すid pool は
   // 「着手済み論点(S.scaffold[topicId]!==undefined || S.cleared[topicId])」のdrill/quizに
   // 限定する。これをしないと未着手論点のidがbuildQueueの「新しい問題」バックフィルに
-  // 混入し、新規ユーザーがいきなり足場2(自力)のドリルへ誘導されてしまう(pedagogy regression)
-  _todayReviewQueue = eng.buildQueue(S.srs, startedIds(S.level), today, 20, Math.random);
+  // 混入し、新規ユーザーがいきなり足場2(自力)のドリルへ誘導されてしまう(pedagogy regression)。
+  // reviewPoolIds(Task 2・v5): クリア済み論点は論点キー("T:"+topicId)1件にまとめる
+  // (クリア済み論点1件は必ず実問題1問に解決されるので、件数表示はそのまま「◯問」で正しい)
+  _todayReviewQueue = eng.buildQueue(S.srs, reviewPoolIds(S.level), today, 20, Math.random);
   // 表示件数はセッション本体(queue, 最大20件)の中でdueなものだけを数える。
   // 全体のdue件数が20を超える場合でも「今日の復習◯問」は1セッション分(最大20)の表示に揃える
   var dueCount = _todayReviewQueue.filter(function (id) { var r = S.srs[id]; return r && r.due <= today; }).length;
@@ -30385,7 +30883,11 @@ function renderToday() {
   // 「合格に効く順」を選んでいるときは、その順の先頭であることが分かるよう見出しも変える
   var nextTopicHtml = "";
   if (nt) {
-    var ntHeading = (S.learnSort === "priority") ? "合格に効く順で次の論点" : "新しい論点に進もう";
+    // 「合格に効く順」のときは現在リング(コア→合格ライン→全網羅)に絞った誘導なので、
+    // 見出しにもリング名を出して「いまどのリングを埋めているか」が伝わるようにする
+    var ntHeading = (S.learnSort === "priority")
+      ? (function () { var m = RING_META[ringProgress(S.level || 3).current]; return m.emoji + m.label + "で次の論点"; })()
+      : "新しい論点に進もう";
     nextTopicHtml =
       '<div class="card today-card">' +
         '<h3>' + ntHeading + '</h3><p>' + priorityBadgeHtml(nt.id) + esc(nt.title) + '</p>' +
@@ -30444,7 +30946,8 @@ function renderToday() {
       '<button type="button" class="btn ghost small" data-act="goto-learn">級をかえる</button>' +
     '</div>';
 
-  root.innerHTML = backupReminderHtml() + levelHtml + reviewHtml + examHtml + streakHtml + goalHtml;
+  root.innerHTML = backupReminderHtml() + ringCelebrateHtml() + ringMeterHtml() +
+    levelHtml + reviewHtml + examHtml + streakHtml + goalHtml;
 }
 
 function todayClickHandler(e) {
@@ -30468,6 +30971,11 @@ function todayClickHandler(e) {
     S.backupRemindSnooze = todayStr();
     save();
     renderToday();
+  } else if (act === "goto-mokushi") {
+    // Ring2祝賀からの模試導線(Task 5)。とっくんタブへ切り替えたうえで模試の回選択画面を開く
+    _mokushiLevel = mokushiFallbackLevel(S.level);
+    _drillScreen = "mokushi";
+    showView("drill");
   }
 }
 
@@ -30530,11 +31038,12 @@ function renderLearn() {
   function topicStateHtml(tp) {
     var stage = S.scaffold[tp.id] || 0;
     var combo = S.combo[tp.id] || 0;
+    var clearTarget = S.clearMode === "solid" ? 3 : 2;
     var state, label;
     if (S.cleared[tp.id]) {
       state = "done"; label = "✓クリア";
     } else if (stage >= 2 && combo > 0) {
-      state = "progress"; label = "あと" + Math.max(1, 3 - combo) + "問でクリア";
+      state = "progress"; label = "あと" + Math.max(1, clearTarget - combo) + "問でクリア";
     } else if (stage >= 2) {
       state = "learning"; label = "あなうめ合格";
     } else if (stage >= 1) {
@@ -30550,13 +31059,31 @@ function renderLearn() {
   if (!lv || !lv.ready) {
     chaptersHtml = '<div class="card"><p>この級はまだ準備中です。</p></div>';
   } else if (sortMode === "priority") {
-    // 合格に効く順: 章の枠を外して1本のリストにする。章名は各行に小さく添えるだけ
+    // 合格に効く順: 章の枠を外して1本のリストにする。章名は各行に小さく添えるだけ。
+    // リング構造(Task 1・v5): topicsByPriorityの並びは重要度top→high→標準の順=
+    // ring1→ring2→ring3の順そのものなので、行を舐めながらringOfが変わった箇所に
+    // 見出しを差し込むだけでグループ化できる。現在リング(rp.current)以外は.ring-dimで薄くする
+    // (タップ自体は禁止しない=強制はしない)
     var rows = topicsByPriority(lv);
+    var rp = ringProgress(lv.id);
+    var lastRing = null;
     var listHtml = rows.map(function (row) {
       var tp = row.topic;
+      var ring = ringOf(tp.id);
+      var headingHtml = "";
+      if (ring !== lastRing) {
+        lastRing = ring;
+        var meta = RING_META[ring];
+        var rd = rp["ring" + ring];
+        headingHtml = '<div class="ring-heading' + (ring === rp.current ? " current" : " ring-dim") + '">' +
+          '<span>' + meta.emoji + meta.label + '</span>' +
+          '<span class="ring-heading-count">' + rd.cleared + '/' + rd.total + '</span></div>';
+      }
       var glow = "";
       if (!S.cleared[tp.id] && !foundNext) { glow = " next-glow"; foundNext = true; }
-      return '<button type="button" class="topic-row prio-row' + glow + '" data-act="open-topic" data-topic="' + esc(tp.id) + '">' +
+      var dimCls = (ring !== rp.current) ? " ring-dim" : "";
+      return headingHtml +
+        '<button type="button" class="topic-row prio-row' + glow + dimCls + '" data-act="open-topic" data-topic="' + esc(tp.id) + '">' +
         topicStateHtml(tp) +
         '<span class="topic-main">' +
           '<span class="topic-title">' + esc(tp.title) + '</span>' +
@@ -31270,7 +31797,10 @@ var ERR_TYPES = [
    ドリルのスキーマはCONTENTのdrillsと同じなので、entryColsHtml/choiceChipsHtml/tenkeyHtml/
    applyEntryAction/classifyError/journalTableをそのまま流用できる。ただし出題順はシャッフルせず
    (本試験どおり)、採点は全問解答後に一括で行う専用セッション(startMokushiSession)を使う。 */
-var _mokushiLevel = 3; // 回選択画面でいま選んでいる級(3|2)。MOKUSHIのキーと直接対応
+// 回選択画面でいま選んでいる級(3|2)。MOKUSHIのキーと直接対応。1級は模試データが無いため
+// 初期表示はS.levelに追従しつつ3にフォールバックする(v4最終レビューfollow-up#2・Task 5)
+function mokushiFallbackLevel(lv) { return lv === 2 ? 2 : 3; }
+var _mokushiLevel = mokushiFallbackLevel(S.level);
 
 // 重複回の一覧(Task 1レポート セクション8で確定)。3級は周期18・完全一致10組、2級は周期5・
 // 6回ずつが互いに完全一致(同型グループ)。回選択画面の「第◯回と同型」注記に使う
@@ -31278,6 +31808,12 @@ var MOKUSHI_DUP_GROUPS = {
   3: [[1, 19], [2, 20], [3, 21], [4, 22], [5, 23], [8, 26], [9, 27], [10, 28], [11, 29], [12, 30]],
   2: [[1, 6, 11, 16, 21, 26], [2, 7, 12, 17, 22, 27], [3, 8, 13, 18, 23, 28], [4, 9, 14, 19, 24, 29], [5, 10, 15, 20, 25, 30]]
 };
+
+// おすすめ5回セット(Task 5)。MOKUSHI_DUP_GROUPSの各グループから1回だけ選び、5回すべてが
+// 互いに非同型になるよう選定(30回中の同型グループ数だけの多様性を確保しつつ全体に散らす)。
+// 3級: 1(グループ[1,19])/5([5,23])/9([9,27])/14(同型なしの単独回)/22([4,22])
+// 2級: 1〜5の各グループから1回ずつ、周期5の6サイクル目までまんべんなく散らす([1,7,13,19,25])
+var RECOMMENDED_ROUNDS = { 3: [1, 5, 9, 14, 22], 2: [1, 7, 13, 19, 25] };
 
 var MOKUSHI_POINTS = { 3: 3, 2: 4 }; // 1問あたりの配点(3級=45点/15問、2級=20点/5問)
 var MOKUSHI_PASS_RATIO = 0.7; // きろく画面「合格ライン到達」の目安(第1問のみの点数に対する比率)
@@ -31483,6 +32019,7 @@ function mokushiHtml() {
   var level = _mokushiLevel;
   var rounds = mokushiData()[level] || [];
   var perQ = MOKUSHI_POINTS[level] || 0;
+  var recommended = RECOMMENDED_ROUNDS[level] || [];
   var rows = rounds.map(function (r) {
     var key = mokushiScoreKey(level, r.round);
     var sc = S.mokushiScores[key];
@@ -31490,20 +32027,43 @@ function mokushiHtml() {
     var scoreHtml = sc
       ? ('<span class="mokushi-round-score tried">★ ' + sc.best + ' / ' + full + '点</span>')
       : ('<span class="mokushi-round-score">未挑戦</span>');
+    var isRecommended = recommended.indexOf(r.round) >= 0;
     var dup = mokushiDupPartners(level, r.round);
-    var dupHtml = dup.length ? ('<span class="mokushi-dup-note">第' + dup.join("・") + '回と同型</span>') : "";
-    return '<button type="button" class="mokushi-round-row" data-act="mokushi-round" data-level="' + level + '" data-round="' + r.round + '">' +
-      '<span class="mokushi-round-title">' + esc(r.title) + '</span>' +
-      '<span class="mokushi-round-meta">' + scoreHtml + dupHtml + '</span>' +
+    var noteHtml;
+    if (isRecommended) {
+      noteHtml = "";
+    } else if (dup.length) {
+      // このグループにおすすめ回が含まれていれば従来どおり「第◯回と同型」注記のみ、
+      // 含まれていなければ(=おすすめ5回とは無関係な同型ペア)「数値ちがいの練習用」ラベルに差し替える
+      var hasRecPartner = dup.some(function (d) { return recommended.indexOf(d) >= 0; });
+      noteHtml = hasRecPartner
+        ? ('<span class="mokushi-dup-note">第' + dup.join("・") + '回と同型</span>')
+        : ('<span class="mokushi-dup-note mokushi-practice-note">数値ちがいの練習用</span>');
+    } else {
+      noteHtml = "";
+    }
+    var badgeHtml = isRecommended ? '<span class="mokushi-rec-badge">⭐おすすめ</span>' : "";
+    return '<button type="button" class="mokushi-round-row' + (isRecommended ? " recommended" : "") + '" data-act="mokushi-round" data-level="' + level + '" data-round="' + r.round + '">' +
+      '<span class="mokushi-round-title">' + badgeHtml + esc(r.title) + '</span>' +
+      '<span class="mokushi-round-meta">' + scoreHtml + noteHtml + '</span>' +
       '</button>';
   }).join("");
+  var levelNoteHtml = (S.level === 1)
+    ? '<p class="mokushi-level-note">1級の模試は準備中です。3級・2級で腕試しできます。</p>'
+    : "";
+  var rp = ringProgress(S.level || 3);
+  var ringHintHtml = (rp.current === 1)
+    ? '<p class="mokushi-ring-hint">まずは🎯コアの論点から固めるのがおすすめです</p>'
+    : "";
   return '<div class="card"><button type="button" class="btn ghost small" data-act="drill-back">← メニューにもどる</button>' +
     '<h3 class="drill-sub-title">🏆 本試験チャレンジ(模試の第1問)</h3>' +
+    levelNoteHtml +
     '<div class="chips mokushi-level-tabs">' +
       '<button type="button" class="chip' + (level === 3 ? " on" : "") + '" data-act="mokushi-set-level" data-level="3">3級</button>' +
       '<button type="button" class="chip' + (level === 2 ? " on" : "") + '" data-act="mokushi-set-level" data-level="2">2級</button>' +
     '</div>' +
-    '<p class="drill-menu-desc">本試験どおり順番出題・全問解いてから一括採点(3級=15問45点/2級=5問20点)。</p>' +
+    '<p class="drill-menu-desc">本試験どおり順番出題・全問解いてから一括採点(3級=15問45点/2級=5問20点)。おすすめ5回セットは互いに数値ちがい無しのユニークな出題です。</p>' +
+    ringHintHtml +
     '<div class="mokushi-round-list">' + rows + '</div>' +
     '</div>';
 }
@@ -31832,6 +32392,18 @@ function settingsHtml() {
       }).join("") + '</div></div>' +
     '<div class="settings-row"><label class="settings-label">お店の名前</label>' +
       '<button type="button" class="btn ghost small" data-act="record-rename-shop">' + esc(S.shopName || "ペンギン商店") + ' を変更</button></div>' +
+    '<div class="settings-row"><label class="settings-label">復習のきめ細かさ</label><div class="chips">' +
+      [["topic", "論点ごと(推奨・速い)"], ["item", "問題ごと(従来)"]].map(function (o) {
+        return '<button type="button" class="chip' + ((S.srsMode || "topic") === o[0] ? " on" : "") + '" data-act="set-srs-mode" data-mode="' + o[0] + '">' + o[1] + '</button>';
+      }).join("") + '</div>' +
+      '<p class="settings-hint">論点ごと: クリア済みの論点はまとめて1件として復習するので、復習の件数が減りテンポよく進みます。' +
+      '問題ごとに戻すと、これから新しくクリアする論点は従来どおり問題単位で復習します(すでに論点ごとに切り替わった分はそのまま動作します)。</p></div>' +
+    '<div class="settings-row"><label class="settings-label">クリア条件</label><div class="chips">' +
+      [["speed", "スピード(2連続+20秒)"], ["solid", "しっかり(3連続)"]].map(function (o) {
+        return '<button type="button" class="chip' + ((S.clearMode || "speed") === o[0] ? " on" : "") + '" data-act="set-clear-mode" data-mode="' + o[0] + '">' + o[1] + '</button>';
+      }).join("") + '</div>' +
+      '<p class="settings-hint">スピード: 2問連続で正解し、どちらも20秒以内に解けたら論点クリアです。' +
+      'しっかりに切り替えると、従来どおり秒数を問わず3問連続正解でクリアになります(すでにクリア済みの論点には影響しません)。</p></div>' +
     '<div class="settings-row"><label class="settings-label">データ</label>' +
       '<button type="button" class="btn ghost small" data-act="export-data">JSONエクスポート</button>' +
       '<label class="btn ghost small settings-import-label">JSONインポート' +
@@ -31952,6 +32524,8 @@ function recordClickHandler(e) {
   else if (act === "memo-copy") { copyMemoText(); }
   else if (act === "set-goal-record") { S.goalMin = +t.dataset.min; save(); renderRecord(); }
   else if (act === "set-theme") { S.theme = t.dataset.theme; save(); applyTheme(); renderRecord(); }
+  else if (act === "set-srs-mode") { S.srsMode = t.dataset.mode; save(); renderRecord(); }
+  else if (act === "set-clear-mode") { S.clearMode = t.dataset.mode; save(); renderRecord(); }
   else if (act === "record-rename-shop") { renameShop(); renderRecord(); }
   else if (act === "export-data") { doExport(); }
   else if (act === "reset-all") { resetAllData(); }
@@ -32001,6 +32575,7 @@ Object.assign(window.Boki, {
   renderToday: renderToday, renderLearn: renderLearn, startReviewQueue: startReviewQueue,
   nextUnclearedTopic: nextUnclearedTopic,
   priorityOf: priorityOf, topicsByPriority: topicsByPriority,
+  ringOf: ringOf, ringProgress: ringProgress, RING_META: RING_META,
   renderShop: renderShop, SHOP_ITEMS: SHOP_ITEMS, STAGE_NAMES: STAGE_NAMES, shopCounts: shopCounts,
   renderDrillTab: renderDrillTab, renderRecord: renderRecord, applyTheme: applyTheme,
   exportDataFile: doExport, doExport: doExport, importFromFile: importFromFile, resetAllData: resetAllData,
